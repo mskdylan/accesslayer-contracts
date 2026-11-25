@@ -1,0 +1,83 @@
+name: Reproducible Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "Dockerfile.release"
+      - ".dockerignore"
+      - "docker/**"
+      - "scripts/**"
+      - "releases.json"
+      - ".github/workflows/reproducible-build.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "Dockerfile.release"
+      - ".dockerignore"
+      - "docker/**"
+      - "scripts/**"
+      - "releases.json"
+      - ".github/workflows/reproducible-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tooling-tests:
+    name: Verification tooling tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: ShellCheck
+        run: |
+          shellcheck docker/build-wasm.sh scripts/*.sh scripts/tests/*.sh
+
+      - name: Run verification tooling tests
+        run: bash scripts/tests/run-tests.sh
+
+      - name: Validate releases.json
+        run: python3 scripts/validate-releases.py
+
+  reproducible-build:
+    name: Two clean builds produce identical wasm
+    needs: tooling-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build pinned builder image
+        run: docker build --file Dockerfile.release --tag accesslayer-wasm-builder:ci .
+
+      - name: Build the same commit twice in separate containers
+        run: |
+          scripts/repro-check.sh \
+            --ref "$GITHUB_SHA" \
+            --image accesslayer-wasm-builder:ci \
+            --skip-image-build
+
+      - name: Publish hashes
+        if: always()
+        run: |
+          echo "### Reproducible build hashes" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat target/reproducible-check/hashes.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-wasm
+          path: target/reproducible-check/
+          if-no-files-found: warn

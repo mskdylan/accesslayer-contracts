@@ -1,3 +1,11 @@
+# Pinned Rust toolchain for every local, container, and CI build.
+#
+# Do not change `channel` to a floating value such as "stable": the release
+# build must be reproducible, and a floating toolchain silently changes the
+# compiler that produces the deployed wasm. Bump this version deliberately and
+# update releases.json's build.rust_toolchain field at the same time.
 [toolchain]
-channel = "stable"
+channel = "1.89.0"
 components = ["clippy", "rustfmt"]
+profile = "minimal"
+targets = ["wasm32v1-none"]

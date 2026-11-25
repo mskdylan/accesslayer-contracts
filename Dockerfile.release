@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1
+#
+# Pinned builder image for reproducible Access Layer contract wasm builds.
+#
+# The source tree is mounted read-only at /source at run time and the built wasm
+# is written to /out by docker/build-wasm.sh. This image deliberately contains
+# no source code: the same image is used for local verification, the CI
+# reproducibility check, and tagged release builds.
+#
+# Keep the versions below in sync with:
+#   - rust-toolchain.toml                  (Rust)
+#   - releases.json -> build               (documented pins)
+#   - scripts/validate-releases.py         (enforces this sync in CI)
+
+FROM rust:1.89.0-bookworm
+
+ARG STELLAR_CLI_VERSION=22.0.1
+
+LABEL org.opencontainers.image.title="Access Layer contract release builder"
+LABEL org.opencontainers.image.description="Pinned Rust and Stellar CLI toolchain for reproducible Soroban wasm builds"
+
+ENV CARGO_HOME=/usr/local/cargo \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_TERM_COLOR=never \
+    CARGO_INCREMENTAL=0 \
+    SOURCE_DATE_EPOCH=0 \
+    TZ=UTC \
+    LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    RUSTFLAGS="--remap-path-prefix=/source=/source --remap-path-prefix=/usr/local/cargo=/cargo --remap-path-prefix=/usr/local/rustup=/rustup"
+
+# Build dependencies for the Stellar CLI (openssl) plus git and CA roots for
+# crate and RPC access.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        git \
+        libssl-dev \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Toolchain components and the Soroban wasm target are pinned by the base image
+# tag and rust-toolchain.toml in the mounted source.
+RUN rustup component add rustfmt clippy \
+    && rustup target add wasm32v1-none \
+    && rustup show active-toolchain
+
+# Pinned Stellar (Soroban) CLI. `cargo install --locked` uses the locked
+# dependency graph published with the CLI release.
+RUN cargo install --locked stellar-cli --version "${STELLAR_CLI_VERSION}" \
+    && stellar --version \
+    && rm -rf "${CARGO_HOME}/registry" "${CARGO_HOME}/git"
+
+COPY docker/build-wasm.sh /usr/local/bin/build-wasm.sh
+RUN chmod 0755 /usr/local/bin/build-wasm.sh
+
+WORKDIR /source
+
+ENTRYPOINT ["/usr/local/bin/build-wasm.sh"]
