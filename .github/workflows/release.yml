@@ -1,0 +1,102 @@
+name: Release Verification Assets
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-assets:
+    name: Build and attach verification metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build pinned builder image
+        run: docker build --file Dockerfile.release --tag accesslayer-wasm-builder:release .
+
+      - name: Verify pinned tool versions in the builder image
+        run: |
+          pinned_rust="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          pinned_cli="$(sed -n 's/^ARG STELLAR_CLI_VERSION=//p' Dockerfile.release)"
+
+          actual_rust="$(docker run --rm --entrypoint rustc accesslayer-wasm-builder:release --version | awk '{print $2}')"
+          actual_cli="$(docker run --rm --entrypoint stellar accesslayer-wasm-builder:release --version | awk '{print $2}')"
+
+          echo "pinned Rust: $pinned_rust (image: $actual_rust)"
+          echo "pinned Stellar CLI: $pinned_cli (image: $actual_cli)"
+
+          test "$actual_rust" = "$pinned_rust" || {
+            echo "error: builder image Rust version does not match rust-toolchain.toml" >&2
+            exit 1
+          }
+          test "$actual_cli" = "$pinned_cli" || {
+            echo "error: builder image Stellar CLI version does not match Dockerfile.release" >&2
+            exit 1
+          }
+
+      - name: Build tagged commit in pinned environment
+        run: |
+          scripts/build-wasm.sh \
+            --ref "$GITHUB_REF_NAME" \
+            --out-dir dist/wasm \
+            --image accesslayer-wasm-builder:release \
+            --skip-image-build
+
+      - name: Generate and validate releases.json
+        env:
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          rust_toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          stellar_cli="$(sed -n 's/^ARG STELLAR_CLI_VERSION=//p' Dockerfile.release)"
+          soroban_sdk="$(sed -n 's/^soroban-sdk *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -n 1)"
+          wasm_sha256="$(cat dist/wasm/creator_keys.wasm.sha256)"
+          released_at="$(git log -1 --format=%cI "$TAG")"
+
+          python3 scripts/generate-release-metadata.py \
+            --releases-file releases.json \
+            --output dist/releases.json \
+            --tag "$TAG" \
+            --commit "$COMMIT" \
+            --wasm-sha256 "$wasm_sha256" \
+            --rust-toolchain "$rust_toolchain" \
+            --soroban-sdk "$soroban_sdk" \
+            --stellar-cli "$stellar_cli" \
+            --released-at "$released_at"
+
+          python3 scripts/validate-releases.py --file dist/releases.json
+          sha256sum dist/releases.json | awk '{print $1}' > dist/releases.json.sha256
+
+      - name: Create release if needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TAG" \
+              --notes "Reproducible wasm and verification metadata are attached. See docs/verification.md for independent verification steps."
+          fi
+
+      - name: Attach verification assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release upload "$TAG" \
+            dist/wasm/creator_keys.wasm \
+            dist/wasm/creator_keys.wasm.sha256 \
+            dist/releases.json \
+            dist/releases.json.sha256 \
+            --clobber

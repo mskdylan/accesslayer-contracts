@@ -1,4 +1,4 @@
-.PHONY: fmt fmt-check clippy test check ci wasm
+.PHONY: fmt fmt-check clippy test check ci wasm repro-wasm repro-check verify-deployment
 
 ## Code formatting targets
 fmt:
@@ -39,6 +39,23 @@ wasm:
 	@echo "factory deploys, not the factory itself. The factory tests only assert on"
 	@echo "registry addresses and never invoke the deployed contract, so a small"
 	@echo "placeholder is sufficient there."
+
+## Reproducible WASM builds and deployment verification
+##
+## Release builds run in the pinned Dockerfile.release environment. See
+## docs/verification.md for the full third-party verification procedure.
+RELEASE_REF ?= HEAD
+
+repro-wasm:
+	./scripts/build-wasm.sh --ref $(RELEASE_REF) --out-dir target/reproducible
+
+repro-check:
+	./scripts/repro-check.sh --ref $(RELEASE_REF)
+
+verify-deployment:
+	@test -n "$(CONTRACT_ID)" || { echo "usage: make verify-deployment CONTRACT_ID=C... RPC_URL=https://... RELEASE_REF=v1.0.0"; exit 2; }
+	@test -n "$(RPC_URL)" || { echo "usage: make verify-deployment CONTRACT_ID=C... RPC_URL=https://... RELEASE_REF=v1.0.0"; exit 2; }
+	./scripts/verify-deployment.sh --contract-id "$(CONTRACT_ID)" --rpc-url "$(RPC_URL)" --ref "$(RELEASE_REF)"
 
 ## Full CI workflow: runs format check, lint, tests, and compilation
 ## This is the standard check sequence to run before pushing to a branch

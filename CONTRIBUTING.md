@@ -75,6 +75,7 @@ For guidance on writing deterministic quote tests, see [docs/deterministic-quote
 - **[Storage Key Invariants](./docs/storage-key-invariants.md)**: Storage model, key structure, and invariants that must be maintained across all operations
 - **[Minimum Viable Test Structure](./docs/minimum-viable-test-structure.md)**: Required test categories and example structures for new contract entrypoints
 - **[Deterministic Quote Tests](./docs/deterministic-quote-tests.md)**: Guide for writing tests for quote operations with the fixed price model
+- **[Verification](./docs/verification.md)**: How releases are built reproducibly and how third parties verify a deployed wasm hash against source
 - **[Quote Math Refactor Guidelines](./docs/quote-math-refactor-guidelines.md)**: Checklist for preserving quote invariants and required regression coverage during quote-path refactors
 - **[Fee Assumptions](./docs/fee-assumptions.md)**: Fee split logic, rounding behavior, and integration points
 - **[Read-only Methods](./docs/read-only-methods.md)**: Return value semantics, units, and edge-case behaviour for every `get_*` / `is_*` entrypoint including all bps fields

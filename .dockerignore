@@ -1,0 +1,5 @@
+# The release builder image contains only toolchains and the build entrypoint.
+# Source code is mounted at run time, so none of the repository is needed.
+*
+!Dockerfile.release
+!docker/build-wasm.sh

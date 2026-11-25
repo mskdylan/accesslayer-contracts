@@ -112,9 +112,20 @@ cargo test --workspace
 
 No additional environment variables are currently required to run the contract verification suite locally. If future contract tests require local configuration, those requirements will be documented alongside the affected tests.
 
+## Reproducible builds and deployment verification
+
+Release builds run in the pinned toolchain defined by [`rust-toolchain.toml`](./rust-toolchain.toml) and [`Dockerfile.release`](./Dockerfile.release). To rebuild a tagged release, check a deployed contract's wasm hash against source, or verify release metadata, follow [docs/verification.md](./docs/verification.md).
+
+```bash
+scripts/repro-check.sh --ref <tag>                                  # build twice, compare hashes
+scripts/verify-deployment.sh --contract-id C... --rpc-url https://... --ref <tag>
+```
+
+Verification uses only public source and a public Soroban RPC endpoint; no account or secret is required. Release builds attach `creator_keys.wasm` and `releases.json` to each GitHub release.
+
 ## Testnet deployment
 
-For contributor test deployments and release checks, use the guide in [docs/stellar-testnet-deployment.md](./docs/stellar-testnet-deployment.md). Store and name release wasm files using [docs/deploy-artifacts.md](./docs/deploy-artifacts.md). For client and server integration expectations (read methods, events, version bumps), see [docs/contract-consumer-boundaries.md](./docs/contract-consumer-boundaries.md). For detailed return value semantics of every read-only entrypoint (units, precision, edge-case outputs), see [docs/read-only-methods.md](./docs/read-only-methods.md). For contract event naming conventions and topic format, see [docs/contract-event-conventions.md](./docs/contract-event-conventions.md). For quote-related storage key behavior and invariants, see [docs/quote-storage-keys.md](./docs/quote-storage-keys.md). For caller restrictions and the authorization model for each public function, see [docs/authorization-model.md](./docs/authorization-model.md). For the bonding curve formula, fee application, and worked price examples, see [docs/bonding-curve-formula.md](./docs/bonding-curve-formula.md). For the locked allocation parameter format, unlock ledger constraints, and supply impact, see [docs/locked-allocation-parameter-format.md](./docs/locked-allocation-parameter-format.md). For key staking storage keys and the data model, see [docs/key-staking-storage.md](./docs/key-staking-storage.md).
+For contributor test deployments and release checks, use the guide in [docs/stellar-testnet-deployment.md](./docs/stellar-testnet-deployment.md). Release and deployment verification is covered in [docs/verification.md](./docs/verification.md). Store and name release wasm files using [docs/deploy-artifacts.md](./docs/deploy-artifacts.md). For client and server integration expectations (read methods, events, version bumps), see [docs/contract-consumer-boundaries.md](./docs/contract-consumer-boundaries.md). For detailed return value semantics of every read-only entrypoint (units, precision, edge-case outputs), see [docs/read-only-methods.md](./docs/read-only-methods.md). For contract event naming conventions and topic format, see [docs/contract-event-conventions.md](./docs/contract-event-conventions.md). For quote-related storage key behavior and invariants, see [docs/quote-storage-keys.md](./docs/quote-storage-keys.md). For caller restrictions and the authorization model for each public function, see [docs/authorization-model.md](./docs/authorization-model.md). For the bonding curve formula, fee application, and worked price examples, see [docs/bonding-curve-formula.md](./docs/bonding-curve-formula.md). For the locked allocation parameter format, unlock ledger constraints, and supply impact, see [docs/locked-allocation-parameter-format.md](./docs/locked-allocation-parameter-format.md). For key staking storage keys and the data model, see [docs/key-staking-storage.md](./docs/key-staking-storage.md).
 
 For referral-chain registration and multi-tier swap-fee reward accounting, see [docs/referral-reward-contract.md](./docs/referral-reward-contract.md).
 
