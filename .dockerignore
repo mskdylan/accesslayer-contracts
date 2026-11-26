@@ -1,0 +1,6 @@
+# Files that never belong in the builder image context. The release build uses
+# a `git archive` tree, so this mainly keeps ad-hoc `docker build .` runs small.
+.git
+target
+dist
+**/test_snapshots
