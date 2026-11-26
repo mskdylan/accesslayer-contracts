@@ -1,3 +1,14 @@
+# Pinned toolchain for reproducible Soroban contract builds.
+#
+# Keep these values in sync with:
+#   - Dockerfile          (builder image: Rust version in the image tag)
+#   - releases.json       (build pins, checked by
+#                          scripts/generate-release-metadata.py validate)
+#
+# `stable` is intentionally not used: a moving channel would change the
+# compiler between releases and therefore change the wasm bytes.
 [toolchain]
-channel = "stable"
+channel = "1.90.0"
 components = ["clippy", "rustfmt"]
+targets = ["wasm32v1-none"]
+profile = "minimal"

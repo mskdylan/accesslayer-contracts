@@ -2,6 +2,10 @@ target/
 .DS_Store
 .soroban/
 
+# Local release/reproducibility build output (scripts/build-release-wasm.sh,
+# release workflow).
+dist/
+
 # Local working notes
 fix.md
 claude.md
@@ -13,3 +17,7 @@ creator-keys/test_snapshots/
 
 issue.md
 pr.md
+
+# Python bytecode from local tooling runs
+__pycache__/
+*.pyc

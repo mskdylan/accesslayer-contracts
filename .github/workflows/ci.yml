@@ -14,10 +14,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Keep the toolchain in sync with rust-toolchain.toml and the Dockerfile.
+      # A floating `stable` toolchain would change what this job compiles.
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.90.0
         with:
-          toolchain: stable
           components: rustfmt, clippy
 
       - name: Rust versions
@@ -33,3 +34,29 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+  reproducible-build:
+    name: Reproducible WASM build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Two independent clean containers build the same commit; the job fails
+      # if the wasm hashes differ. See docs/verification.md.
+      - name: Build the same commit twice and compare wasm hashes
+        run: ./scripts/repro-check.sh
+
+  release-metadata:
+    name: Release metadata validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate releases.json pins and records
+        run: python3 scripts/generate-release-metadata.py validate

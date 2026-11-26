@@ -1,4 +1,4 @@
-.PHONY: fmt fmt-check clippy test check ci wasm
+.PHONY: fmt fmt-check clippy test check ci wasm release-wasm repro-check release-metadata-check
 
 ## Code formatting targets
 fmt:
@@ -44,6 +44,20 @@ wasm:
 ## This is the standard check sequence to run before pushing to a branch
 ci: fmt-check clippy test check
 	@echo "✓ All CI checks passed"
+
+## Build the release wasm for a git ref in the pinned builder container.
+## Usage: make release-wasm REF=v0.1.0
+REF ?= HEAD
+release-wasm:
+	./scripts/build-release-wasm.sh --ref "$(REF)" --package creator-keys --out-dir dist
+
+## Build the same commit twice in clean containers and compare hashes.
+repro-check:
+	./scripts/repro-check.sh
+
+## Validate releases.json pins and recorded releases.
+release-metadata-check:
+	python3 scripts/generate-release-metadata.py validate
 
 ## Convenience alias for running format checks and fixes
 fmt-fix:

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "build": {
+    "rust": "1.90.0",
+    "sorobanCli": "25.2.0",
+    "sorobanSdk": "22.0.11",
+    "builderImage": "stellar/stellar-cli:25.2.0-rust1.90.0-slim-bookworm@sha256:d568e243c18c306af45330d05276c4ebabce05a46c2197743a4fcadbbadab927"
+  },
+  "releases": []
+}

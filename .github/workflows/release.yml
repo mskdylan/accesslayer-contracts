@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)build and publish"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Reproducible build and release metadata
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve release tag
+        id: release
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG:-$REF_NAME}"
+          if [ -z "$TAG" ]; then
+            echo "::error::No release tag provided."
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" >/dev/null; then
+            echo "::error::Tag $TAG does not exist. Create the tag before running this workflow."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse "refs/tags/$TAG^{commit}")" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release metadata pins
+        run: python3 scripts/generate-release-metadata.py validate
+
+      - name: Build wasm in the pinned container
+        run: |
+          scripts/build-release-wasm.sh \
+            --ref "${{ steps.release.outputs.tag }}" \
+            --package creator-keys \
+            --out-dir dist
+
+      - name: Generate release metadata
+        run: |
+          python3 scripts/generate-release-metadata.py generate \
+            --tag "${{ steps.release.outputs.tag }}" \
+            --commit "${{ steps.release.outputs.commit }}" \
+            --wasm "creator-keys=dist/creator_keys.wasm" \
+            --out dist/release-metadata.json \
+            --update dist/releases.json
+
+      - name: Validate the updated release ledger
+        run: python3 scripts/generate-release-metadata.py validate --releases dist/releases.json
+
+      - name: Attach wasm and metadata to the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          assets=(
+            dist/creator_keys.wasm
+            dist/creator_keys.wasm.sha256
+            dist/release-metadata.json
+            dist/releases.json
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --verify-tag \
+              --title "$TAG" \
+              --notes "Reproducible wasm and build metadata produced by the pinned container in this repository. Verify with scripts/verify-deployment.sh; see docs/verification.md."
+          fi
